@@ -1,0 +1,7 @@
+google_api_python_client==2.66.0
+google_auth_oauthlib==0.7.1
+icalendar==5.0.2
+mysql_connector_repackaged==0.3.1
+protobuf==4.21.9
+pytz==2022.6
+spade==3.2.2
