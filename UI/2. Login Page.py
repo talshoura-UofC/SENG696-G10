@@ -1,0 +1,27 @@
+#Login Page
+from tkinter import * 
+import tkinter as tk
+from PIL import ImageTk, Image
+large_font=('Bahnschrift Condensed',20)
+LPage=tk.Tk()
+background=Canvas(LPage,width=600,height=600)
+image=ImageTk.PhotoImage(Image.open("Login Page.jpg"))
+background.create_image(0,0,anchor='nw',image=image)
+background.pack(expand=True,fill=BOTH)
+LPage.geometry('600x600')
+back=ImageTk.PhotoImage(Image.open("Back-Button-Logo.jpg"))
+backButtonLabel=Label(image=back)
+backButton=Button(LPage,image=back,borderwidth=0,highlightthickness=0)
+backButton.place(x=450,y=15)
+user=ImageTk.PhotoImage(Image.open("User Logo.jpg"))
+userButtonLabel=Label(image=user)
+userButton=Button(LPage,image=user,command=user,borderwidth=0,highlightthickness=0)
+userButton.place(x=550,y=8)
+username=Entry(LPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+username.place(x=250,y=233)
+password=Entry(LPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+password.place(x=250,y=344)
+submit=ImageTk.PhotoImage(Image.open("Submit Button.jpg"))
+submitButtonLabel=Label(image=submit)
+submitButton=Button(LPage,image=submit,borderwidth=0,highlightthickness=0,command=submit)
+submitButton.place(x=235,y=470)

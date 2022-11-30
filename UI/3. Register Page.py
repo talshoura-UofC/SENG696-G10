@@ -1,0 +1,62 @@
+#Register Page Code
+from tkinter import * 
+import tkinter as tk
+from PIL import ImageTk, Image
+def submit():
+    s=v.get()
+    print(s)
+    entry1= firstname.get()
+    entry2=lastname.get()
+    entry3=email.get()
+    entry4=password.get()                
+    conn=mysql.connector.connect(user='root', password='12ammu34',database='mindcology')
+    mycursor=conn.cursor()
+    sql=('''INSERT INTO REGISTRATION (FIRSTNAME,LASTNAME,USERNAME,PASSWORD)
+VALUES(%s,%s,%s,%s)''')
+    val = (entry1,entry2,entry3,entry4)
+    mycursor.execute(sql,val)
+    conn.commit()
+    messagebox.showinfo('Error','Sup')
+large_font=('Bahnschrift Condensed',20)
+RPage=tk.Tk()
+background=Canvas(RPage,width=600,height=600)
+image=ImageTk.PhotoImage(Image.open("Registration Page.jpg"))
+background.create_image(0,0,anchor='nw',image=image)
+background.pack(expand=True,fill=BOTH)
+RPage.geometry('600x600')
+back=ImageTk.PhotoImage(Image.open("Back-Button-Logo.jpg"))
+backButtonLabel=Label(image=back)
+backButton=Button(RPage,image=back,borderwidth=0,highlightthickness=0)
+backButton.place(x=450,y=15)
+user=ImageTk.PhotoImage(Image.open("User Logo.jpg"))
+userButtonLabel=Label(image=user)
+userButton=Button(RPage,image=user,command=user,borderwidth=0,highlightthickness=0)
+userButton.place(x=550,y=8)
+firstname=Entry(RPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+firstname.place(x=250,y=156)
+firstname.bind('<Return>',submit) 
+lastname=Entry(RPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+lastname.place(x=250,y=228)
+lastname.bind('<Return>',submit) 
+email=Entry(RPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+email.place(x=250,y=298)
+email.bind('<Return>',submit) 
+username=Entry(RPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+username.place(x=250,y=370)
+username.bind('<Return>',submit) 
+password=Entry(RPage,font=large_font,bg="black",fg="white",width=24,insertbackground="white")
+password.place(x=250,y=439)
+password.bind('<Return>',submit) 
+submit=ImageTk.PhotoImage(Image.open("Submit Button.jpg"))
+submitButtonLabel=Label(image=submit)
+submitButton=Button(RPage,image=submit,borderwidth=0,highlightthickness=0)
+submitButton.place(x=235,y=511)
+v=IntVar()
+Allowance=Checkbutton(RPage,text ='By checking this, you agree to our Terms and Conditions and shall be added to our Mailing List',font=('Bahnschrift Condensed',12),bg='white',fg='black',variable=v)
+Allowance.place(x=10,y=570)
+
+
+
+
+
+
