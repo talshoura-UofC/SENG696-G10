@@ -18,6 +18,12 @@ DEBUG = 1
 #%% reciever
 
 class RegistrationBehav(CyclicBehaviour):
+    """
+        defining behavoiur
+
+    Args:
+        CyclicBehaviour -> type cyclic
+    """
     def register_user(self, data):
         """
         This function is responsible for creating users
@@ -27,7 +33,7 @@ class RegistrationBehav(CyclicBehaviour):
 
         #defining DB credintials
         mydb = mysql.connector.connect(
-            host= "10.13.145.180", #"25.69.251.254", #"192.168.0.101",
+            host= "25.69.251.254", #"192.168.0.101",
             user= "username",
             password= "password",
             database= "alnasera",
@@ -37,6 +43,7 @@ class RegistrationBehav(CyclicBehaviour):
 
         mycursor = mydb.cursor()
 
+        #Query for inserting the given informations for adding new user
         sql = (
             "INSERT INTO users_db.patients "
             "(FIRST_NAME, LAST_NAME, EMAIL, PHONE, ADDRESS, PASSWORD) "
@@ -44,12 +51,13 @@ class RegistrationBehav(CyclicBehaviour):
             "%(Address)s, %(Password)s)"
             )
 
+        #Error handling for query executing
         try:
             mycursor.execute(sql, data)
             mydb.commit()
             mycursor.close()
             if DEBUG:
-                print(mycursor.rowcount, "record inserted.") #TODO CHECK IF len < 1
+                print(mycursor.rowcount, "record inserted.") 
             return 1
 
         except mysql.connector.Error as err:
@@ -60,8 +68,13 @@ class RegistrationBehav(CyclicBehaviour):
             return 0
 
     async def msg_response(self, msg, state):
+        """
+            This function is responsible for creating messeages based on registration states
+            for example in sucessful insertion it gives an confirmation for future use
+
+        """
         if state:
-            msg.set_metadata("performative", "confirm")  # Set the "confimr" FIPA performative
+            msg.set_metadata("performative", "confirm")  # Set the "confirm" FIPA performative
         else:
             msg.set_metadata("performative", "failure")        
         msg.body = ""
@@ -70,6 +83,13 @@ class RegistrationBehav(CyclicBehaviour):
         print("Response sent!")
 
     async def run(self):
+
+        """ 
+            In this function the agent waits for a specified amount of time and listen for messages 
+            then based on result of register_user method which was explained earier return success or failure flag
+
+        """
+
         print("\n\n\n====================================")
         print("Entering Registration Behav:")
         msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
@@ -103,6 +123,11 @@ class RegistrationAgentComponent(Agent):
 
 
 class Registration_Agent:
+
+    """
+        The actual class for registration agent which has the already explained behaviour for its only one behaviour
+    """
+
     def loadBehaviour(self):
         self.behav = RegistrationBehav()
 

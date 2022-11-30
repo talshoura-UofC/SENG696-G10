@@ -3,11 +3,6 @@ import os
 import pickle
 import time
 import json
-from icalendar import Calendar, Event, vCalAddress, vText
-from datetime import datetime, timedelta
-from pathlib import Path
-import os
-import pytz
 import mysql.connector
 import spade
 from spade.agent import Agent
@@ -36,48 +31,12 @@ our_email = 'tariq.al.shoura.development@gmail.com'
 
 
 class NotificationBehav(CyclicBehaviour):
-    def generate_calendar_event(self, data):
-        # init the calendar
-        cal = Calendar()
+    """
+        defining behavoiur
 
-        # Some properties are required to be compliant
-        cal.add('prodid', '-//MINDCOLOGY//NOTIFICATION_AGENT//')
-        cal.add('version', '2.0')
-
-        # Add subcomponents
-        event = Event()
-        event.add('name', 'Notification Email')
-        event.add('description', 'Dear Sir/Madam,\n\nPlease find the meeting details in this invite.\n\nMindcology Team')
-        date=datetime.strptime(data["APPOINTMENT_DATE"], "%Y-%m-%d") 
-        time=datetime.strptime(data["APPOINTMENT_TIME"], "%H:%M:%S").time()
-        event.add('dtstart', datetime.combine(date, time))
-        event.add('dtend', datetime.combine(date, time)+timedelta(minutes=29))
-        event.add('summary', "Appointment Details")
-        
-        # Add the organizer
-        organizer = vCalAddress('MAILTO:DO-NO-REPLY@MINDCOLOGY.com')
-        
-        # Add parameters of the event
-        organizer.params['name'] = vText('MINDCOLOGY')
-        organizer.params['role'] = vText('System Email')
-        event['organizer'] = organizer
-        event['location'] = vText('Calgary, ca')
-        
-        event['uid'] = "some random number" #data["DOCTOR_FIRST_NAME"]+data["DOCTOR_LAST_NAME"]+data["APPOINTMENT_DATE"] + data["APPOINTMENT_TIME"] + ["USER_EMAIL"]
-        event.add('priority', 5)
-        
-        # Add the event to the calendar
-        cal.add_component(event)
-        
-        # Write to disk
-        directory = os.getcwd()
-        f = open(os.path.join(directory, 'appointment.ics'), 'wb')
-        f.write(cal.to_ical())
-        f.close()
-        print("Directory is:", os.path.join(directory, 'appointment.ics'))
-        return 'appointment.ics'
-
-
+    Args:
+        CyclicBehaviour -> type cyclic
+    """
     def gmail_authenticate(self):
         creds = None
         # the file token.pickle stores the user's access and refresh tokens, and is
@@ -90,7 +49,7 @@ class NotificationBehav(CyclicBehaviour):
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
+                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
             # save the credentials for the next run
             with open("token.pickle", "wb") as token:
@@ -149,6 +108,9 @@ class NotificationBehav(CyclicBehaviour):
         ).execute()
 
     def message_payload(self, data):
+        """
+            body structure of confirmation email 
+        """
         html = """\
         <html>
         <head></head>
@@ -157,7 +119,7 @@ class NotificationBehav(CyclicBehaviour):
             This is a confirmation email for you appointment with Dr.{firstName} {lastName}<br>
             The appointment has been scheduled on: {date} at: {time}<br><br>
             <b>Regards,</b><br>
-            Mindcology Team
+            System
         </body>
         </html>
         """.format(
@@ -169,6 +131,12 @@ class NotificationBehav(CyclicBehaviour):
         return html
 
     async def run(self):
+
+        """ 
+            In this function the agent waits for a specified amount of time and listen for messages 
+            then based on result of send_message method which was explained earier return success or failure flag
+
+        """
         print("\n\n\n====================================")
         print("Notification Behav running")
         msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
@@ -180,10 +148,9 @@ class NotificationBehav(CyclicBehaviour):
             request = json.loads(msg.body)
 
             receiver_email = request["USER_EMAIL"] #"Tariq.AlShoura@ucalgary.ca" #
-            subject = 'Appointment Confirmation - Mindcology'
+            subject = 'Testing Googles APIs - Completed'
             payload = self.message_payload(request)
-            cal = self.generate_calendar_event(request)
-            out = self.send_message(receiver_email, subject, payload, [cal])
+            out = self.send_message(receiver_email, subject, payload)
             print("Successfully Completed Behaviour\n\nemail details are:", out)
                 
 
@@ -200,6 +167,10 @@ class NotificationAgentComponent(Agent):
 
 
 class Notification_Agent():
+    """
+        The actual class for notification agent which has the already explained behaviour for its only one behaviour
+    """
+
     def loadBehaviour(self):
         self.behav = NotificationBehav()
     

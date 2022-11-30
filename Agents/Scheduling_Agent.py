@@ -9,26 +9,41 @@ from spade.message import Message
 from spade.template import Template
 import Directory_Facilitators as DS
 
+#Initiallizing the DEBUG for later use
 DEBUG = 1
 
+#Defining the containers for using as templates
 query_data = {
-    "Doctor_ID": 3
+    "Doctor_ID": 0
 }
 
 allocate_data = {
-    "Appointment_ID": 2,
-    "User_ID": 59
+    "Appointment_ID": 0,
+    "User_ID": 0
 }
 
 
 #%%
 class QueryDBBehav(CyclicBehaviour):
+    """
+        defining behavoiur
+
+    Args:
+        CyclicBehaviour -> type cyclic
+    """
     def fetch_appointments(self, data):
+        """
+            This function is responsible for fetching appointments by given data which is DOCTOR_ID here.
+        Args:
+            data -> filter for query
+
+        Returns: numbers for different states
+        """
         if DEBUG: print(data)
 
         #defining DB credintials
         mydb = mysql.connector.connect(
-            host= "10.13.145.180", #"25.69.251.254", #"192.168.0.101",
+            host= "25.69.251.254", #"192.168.0.101",
             user= "username",
             password= "password",
             database= "alnasera",
@@ -36,6 +51,8 @@ class QueryDBBehav(CyclicBehaviour):
         if DEBUG: print("mydb:", mydb)
 
         mycursor = mydb.cursor(dictionary=True)
+
+        #Query for fetching available appointments based on given DOCTOR_ID
 
         sql = (
             "SELECT "
@@ -57,6 +74,8 @@ class QueryDBBehav(CyclicBehaviour):
             # "AND Timestamp(appointments_db.appointments.APPOINTMENT_DATE, appointments_db.appointments.APPOINTMENT_TIME) > now()"
             )
 
+        #Error handling for query executing
+
         try:
             mycursor.execute(sql, data)
             results = mycursor.fetchall()
@@ -75,8 +94,13 @@ class QueryDBBehav(CyclicBehaviour):
             return 0
 
     async def msg_response(self, msg, state):
+        """
+            This function is responsible for creating messeages based on fetching appointments states
+            for example in sucessful state it gives an confirmation for future use
+
+        """
         if state:
-            msg.set_metadata("performative", "confirm")  # Set the "confimr" FIPA performative
+            msg.set_metadata("performative", "confirm")  # Set the "confirm" FIPA performative
         else:
             msg.set_metadata("performative", "failure")
         
@@ -84,7 +108,16 @@ class QueryDBBehav(CyclicBehaviour):
         await self.send(msg)
         print("Response sent!")
 
+
+
     async def run(self):
+        
+        """ 
+            In this function the agent waits for a specified amount of time and listen for messages 
+            then based on result of fetch_appointments method which was explained earier return success or failure flag
+
+        """
+
         print("\n\n\n====================================")
         print("QueryDB Behav running")
         msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
@@ -118,12 +151,22 @@ class QueryDBBehav(CyclicBehaviour):
 
 #%%
 class AllocateDBBehav(CyclicBehaviour):
+    """
+        defining behavoiur
+
+    Args:
+        CyclicBehaviour -> type cyclic
+    """
     def fetch_appointment_details(self, data):
+        """
+            This function fetches details of the appointment to allocate it later by given user for Appointment_ID
+
+        """
         if DEBUG: print(data)
 
         #defining DB credintials
         mydb = mysql.connector.connect(
-            host= "10.13.145.180", #"25.69.251.254",
+            host= "25.69.251.254",
             user= "username",
             password= "password",
             database= "alnasera",
@@ -131,6 +174,8 @@ class AllocateDBBehav(CyclicBehaviour):
         if DEBUG: print("mydb:", mydb)
 
         mycursor = mydb.cursor(dictionary=True)
+
+        #Query for fetching details of the appointment based on given Appointment_ID
 
         sql = (
             "SELECT "
@@ -149,6 +194,7 @@ class AllocateDBBehav(CyclicBehaviour):
             "AND appointments_db.appointments.SN = %(Appointment_ID)s "
         )
 
+        #Error handling for query executing
         try:
             mycursor.execute(sql, data)
             results = mycursor.fetchall()
@@ -168,8 +214,13 @@ class AllocateDBBehav(CyclicBehaviour):
 
 
     async def send_notification(self, data):
-        appointment = self.fetch_appointment_details(data)
+        """
+            This function returns the needed details for notification agent
+
+        """
+        appointment = self.fetch_appointment_details(data) #get the appointment first
         if appointment:
+            #data
             notificationData = {
                 "USER_EMAIL": data["User_Email"],
                 "APPOINTMENT_DATE": appointment[0]["APPOINTMENT_DATE"],
@@ -199,11 +250,16 @@ class AllocateDBBehav(CyclicBehaviour):
 
 
     def allocate_appointment(self, data):
+        """
+            This function allocate the appointment to the user, the appointment should be given, this function needs
+            User_ID and Appointment_ID for allocating
+
+        """
         if DEBUG: print(data)
 
         #defining DB credintials
         mydb = mysql.connector.connect(
-            host= "10.13.145.180", #"25.69.251.254", #"192.168.0.101",
+            host= "25.69.251.254", #"192.168.0.101",
             user= "username",
             password= "password",
             database= "alnasera",
@@ -212,6 +268,8 @@ class AllocateDBBehav(CyclicBehaviour):
 
         mycursor = mydb.cursor(dictionary=True)
 
+        #Query for allocating the appointment based on given User_ID and Appointment_ID 
+
         sql = (
             "UPDATE appointments_db.appointments "
             # " SET APPOINTMENT_STATUS = 'B', PATIENT_ID =%(User_ID)s "
@@ -219,6 +277,8 @@ class AllocateDBBehav(CyclicBehaviour):
             "PATIENT_ID = if(PATIENT_ID IS NULL, %(User_ID)s, PATIENT_ID) "
             "WHERE (SN = %(Appointment_ID)s)"
         )
+
+        #Error handling for query executing
 
         try:
             mycursor.execute(sql, data)
@@ -244,6 +304,13 @@ class AllocateDBBehav(CyclicBehaviour):
             return 3
 
     async def msg_response(self, msg, state):
+
+        """
+            This function is responsible for creating messeages based on allocating appointments states
+            for example in sucessful state it gives an confirmation for future use
+
+        """
+
         if state:
             msg.set_metadata("performative", "confirm")  # Set the "confimr" FIPA performative
         else:
@@ -254,6 +321,13 @@ class AllocateDBBehav(CyclicBehaviour):
         print("Response sent!")
 
     async def run(self):
+
+        """ 
+            In this function the agent waits for a specified amount of time and listen for messages 
+            then based on result of allocate_appointment method which was explained earier return success or failure flag
+
+        """
+
         print("\n\n\n====================================")
         print("AllocateDB Behav running")
         msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
@@ -291,6 +365,10 @@ class SchedulingAgentComponent(Agent):
         print("Starting Scheduling Agent")
 
 class Scheduling_Agent():
+
+    """
+        The actual class for scheduling agent which has the already explained behaviours for its two behaviours
+    """
     def loadBehaviour(self):
         self.Qbehav = QueryDBBehav()
         self.Q_template = Template()

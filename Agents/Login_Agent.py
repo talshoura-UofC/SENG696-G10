@@ -20,16 +20,22 @@ DEBUG = 1
 
 #%% reciever
 class LoginBehav(CyclicBehaviour):
+    """
+        defining behavoiur
+
+    Args:
+        CyclicBehaviour -> type cyclic
+    """
     def login_user(self, data):
         """
-        This function is responsible for creating users
-        It returns 1 on successful creation and
+        This function is responsible for authenticating users
+        It returns 1 on successful login and
         returns 0 if an error is raised
         """
 
         #defining DB credintials
         mydb = mysql.connector.connect(
-            host= "10.13.145.180", # "25.69.251.254", #"192.168.0.101",
+            host= "25.69.251.254", #"192.168.0.101",
             user= "username",
             password= "password",
             database= "alnasera",
@@ -39,11 +45,12 @@ class LoginBehav(CyclicBehaviour):
 
         mycursor = mydb.cursor(dictionary=True)
 
+        #The query for fetching user with given email and password
         sql = (
             "SELECT * FROM users_db.patients "
             "WHERE EMAIL = %(Email)s AND PASSWORD = %(Password)s"
             )
-
+        #Error handling for query executing
         try:
             mycursor.execute(sql, data)
             results = mycursor.fetchall()
@@ -69,6 +76,11 @@ class LoginBehav(CyclicBehaviour):
 
 
     async def msg_response(self, msg, state, info=[]):
+        """
+            This function is responsible for creating messeages based on login states
+            for example in sucessful authentication it gives an confirmation for future use
+
+        """
         if state:
             msg.set_metadata("performative", "confirm")  # Set the "confimr" FIPA performative
             payload={
@@ -84,6 +96,13 @@ class LoginBehav(CyclicBehaviour):
         print("Response sent!")
 
     async def run(self):
+
+        """ 
+            In this function the agent waits for a specified amount of time and listen for messages 
+            then based on result of login_user method which was explained earier return success or failure flag
+
+        """
+
         print("\n\n\n====================================")
         print("Entering Login Behav:")
         msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
@@ -116,10 +135,14 @@ class LoginAgentComponent(Agent):
         print("Login Agent started")
 
 class Login_Agent:
+    """
+        The actual class for login agent which has the already explained behaviour for its only one behaviour
+    """
+
     def loadBehaviour(self):
         self.behav = LoginBehav()
 
-    def beginCommunications(self):
+    def beginCommunications(self): #starting point of communication
         self.loginagent = LoginAgentComponent(DS.Login["username"], DS.Login["password"])
         self.loginagent.add_behaviour(self.behav)
         self.future = self.loginagent.start()
