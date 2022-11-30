@@ -1,3 +1,8 @@
+# This python code emulated a centeralized system which
+# contains the information of the differnet agents to allow
+# them to be able to find and communicate with each other.
+
+
 Login = {
     "username": "alimd@hot-chilli.net",
     "password": "M.iYa9R#TB3tH.9"

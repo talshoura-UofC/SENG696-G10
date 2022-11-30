@@ -1,4 +1,14 @@
+# This is the Scheduling agent, the agent is designed to run in a cyclic
+# behaviour where it wait for incoming fetch or allocate requests 
+# and communicates with the database to either obtain available 
+# appointments or to allocate an appointment for a given user
+# returning a list the avialable appoinments for the fetch appointments
+# and returning "confirm" or "failure" in the case of appointment
+# allocation to the requesting agent, in addition to sending a request
+
+
 #%%
+# Importing the required libraries
 import time
 import json
 import mysql.connector
@@ -9,10 +19,12 @@ from spade.message import Message
 from spade.template import Template
 import Directory_Facilitators as DS
 
-#Initiallizing the DEBUG for later use
+# A control variable, 1: print debug information, 0: no print
+
 DEBUG = 1
 
-#Defining the containers for using as templates
+# Defining the data template and container to be used to transfer
+# the information between the different funcitons and components
 query_data = {
     "Doctor_ID": 0
 }
@@ -25,35 +37,39 @@ allocate_data = {
 
 #%%
 class QueryDBBehav(CyclicBehaviour):
-    """
-        defining behavoiur
-
-    Args:
-        CyclicBehaviour -> type cyclic
-    """
+    # This behaviour is used in the fetch appointment use case, it 
+    # continues running awaiting Query requests, then checks the 
+    # Appointments Database, returning the available appointments
+    # to the requesting agent if they any of them exists 
+    #
+    # Args:
+    #     CyclicBehaviour (CyclicBehaviour): Spade's CyclicBehaviour
+    
     def fetch_appointments(self, data):
-        """
-            This function is responsible for fetching appointments by given data which is DOCTOR_ID here.
-        Args:
-            data -> filter for query
+        # This function is responsible for fetching and returning
+        # the available appointments from the database
+        # 
+        # Args:
+        #     data (dict): A dictionary containing the required doctor's ID
+        #
+        # Returns:
+        #     list<dict>: if successful communication with the database has
+        #         concluded
+        #     int: (0) if an error occurs
 
-        Returns: numbers for different states
-        """
-        if DEBUG: print(data)
-
-        #defining DB credintials
+        # Defining DB credintials
         mydb = mysql.connector.connect(
             host= "25.69.251.254", #"192.168.0.101",
             user= "username",
             password= "password",
-            database= "alnasera",
+            database= "appointments_db",
         )
         if DEBUG: print("mydb:", mydb)
 
         mycursor = mydb.cursor(dictionary=True)
 
-        #Query for fetching available appointments based on given DOCTOR_ID
-
+        # The query to fetch the upcoming available appointments based 
+        # on given the provided DOCTOR_ID
         sql = (
             "SELECT "
             "   appointments_db.appointments.SN, "
@@ -63,19 +79,16 @@ class QueryDBBehav(CyclicBehaviour):
             "   appointments_db.appointments.DOCTOR_ID, "
             "   appointments_db.doctors.FIRST_NAME, "
             "   appointments_db.doctors.LAST_NAME, "
-            # "   appointments_db.appointments.PATIENT_ID, "
             "   appointments_db.specializations.NAME as field "
             "FROM appointments_db.appointments, appointments_db.doctors, appointments_db.specializations "
             "WHERE appointments_db.appointments.DOCTOR_ID = appointments_db.doctors.SN "
             "AND appointments_db.doctors.SPECIALIZATION = appointments_db.specializations.SN "
             "AND appointments_db.appointments.APPOINTMENT_STATUS = 'A' "
-            # "AND appointments_db.specializations.NAME = %(Specialization)s "
             "AND appointments_db.appointments.DOCTOR_ID = %(Doctor_ID)s "
-            # "AND Timestamp(appointments_db.appointments.APPOINTMENT_DATE, appointments_db.appointments.APPOINTMENT_TIME) > now()"
+            "AND Timestamp(appointments_db.appointments.APPOINTMENT_DATE, appointments_db.appointments.APPOINTMENT_TIME) > now()"
             )
 
-        #Error handling for query executing
-
+        # Query execution and error handling
         try:
             mycursor.execute(sql, data)
             results = mycursor.fetchall()
@@ -94,41 +107,52 @@ class QueryDBBehav(CyclicBehaviour):
             return 0
 
     async def msg_response(self, msg, state):
-        """
-            This function is responsible for creating messeages based on fetching appointments states
-            for example in sucessful state it gives an confirmation for future use
+        # This function is responsible for creating a response messeage
+        # based on the fetch state, where it changes the messages 
+        # perfomative into "confirm" on a successful state and "failure"
+        # otherwise
+        #
+        # Args:
+        #     msg (spade.message.Message): The message template of SPADE
+        #     state (bool): The state of the fetch operation
 
-        """
         if state:
-            msg.set_metadata("performative", "confirm")  # Set the "confirm" FIPA performative
+            # Set the "confirm" FIPA performative
+            msg.set_metadata("performative", "confirm") 
         else:
+            # Set the "failutre" FIPA performative
             msg.set_metadata("performative", "failure")
         
         print("\n_______RESPONSE:_______\n",msg, "\n______________")
         await self.send(msg)
         print("Response sent!")
 
-
-
     async def run(self):
-        
-        """ 
-            In this function the agent waits for a specified amount of time and listen for messages 
-            then based on result of fetch_appointments method which was explained earier return success or failure flag
-
-        """
+        # This is a method required part of spade's CyclicBehaviour
+        # class and defines the main functionality of the behaviour
+        #
+        # The behaviour refreshs every 10 secs waiting for a request
+        # If a request comes through it is processed and a reply is sent
+        # If no request comes through the cycle repeats waiting
 
         print("\n\n\n====================================")
         print("QueryDB Behav running")
-        msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
+        # wait for a message for 10 seconds
+        msg = await self.receive(timeout=10)
         if msg:
-            print("\n________________________\n", msg, "\n________________________")
+            # if a message comes print a log of the details
+            print("\n________________________\n", 
+                    msg, 
+                    "\n________________________"
+            )
             print(F"Message received with content: {msg.body}")
             print(msg.metadata)
             print("Ontology is: ", msg.metadata["ontology"])
             request = json.loads(msg.body)
             print("Doctor ID is:", request["Doctor_ID"])
 
+            # Querying the database for available appointment and
+            # sending the response based on the fetching result
             response = self.fetch_appointments(request)
             if response:
                 msg.body = response
@@ -142,41 +166,51 @@ class QueryDBBehav(CyclicBehaviour):
 
         else:
             print("Did not received any message after 10 seconds")
-            # self.kill()
     
     async def on_end(self):
+        # This is a method required part of spade's CyclicBehaviour
+        # which defines the actions to be taken on the end of the behaviour
         await self.agent.stop()
 
 
 
 #%%
 class AllocateDBBehav(CyclicBehaviour):
-    """
-        defining behavoiur
-
-    Args:
-        CyclicBehaviour -> type cyclic
-    """
+    # This behaviour is used in the allocate appointment use case, it 
+    # continues running awaiting Query requests, then checks the 
+    # Appointments Database, returning "confirm" or "failure"
+    # performative to the requesting agent based on whether the
+    # the appointment has been successfully allocated in the
+    # Appointments DB
+    #
+    # Args:
+    #     CyclicBehaviour (CyclicBehaviour): Spade's CyclicBehaviour
+ 
     def fetch_appointment_details(self, data):
-        """
-            This function fetches details of the appointment to allocate it later by given user for Appointment_ID
+        # This function is responsible for authenticating users. 
+        # It returns 1 on successful login and 0 if an error is raised
+        # or if the no records matching the data was found
+        #
+        # Args:
+        #     data (dict): A dictionary containing the Appointment's SN
+        #
+        # Returns:
+        #     dict: if successful communication with the database has
+        #         concluded, contains the appointments details
+        #     int: (0) if an error occurs
 
-        """
-        if DEBUG: print(data)
-
-        #defining DB credintials
+        # Defining DB credintials
         mydb = mysql.connector.connect(
             host= "25.69.251.254",
             user= "username",
             password= "password",
-            database= "alnasera",
+            database= "appointments_db",
         )
         if DEBUG: print("mydb:", mydb)
 
         mycursor = mydb.cursor(dictionary=True)
 
-        #Query for fetching details of the appointment based on given Appointment_ID
-
+        # The query to fetch the appointment details based on the SN
         sql = (
             "SELECT "
             "   appointments_db.appointments.SN, "
@@ -194,7 +228,7 @@ class AllocateDBBehav(CyclicBehaviour):
             "AND appointments_db.appointments.SN = %(Appointment_ID)s "
         )
 
-        #Error handling for query executing
+        # Query execution and error handling
         try:
             mycursor.execute(sql, data)
             results = mycursor.fetchall()
@@ -214,13 +248,17 @@ class AllocateDBBehav(CyclicBehaviour):
 
 
     async def send_notification(self, data):
-        """
-            This function returns the needed details for notification agent
+        # This function is responsible for creating a messeage to the
+        # notification agent with the details of the allocated 
+        # appointment to send an email to the user
+        #
+        # Args:
+        #     msg (spade.message.Message): The message template of SPADE
+        #     data (dict): A dictionary containing the appointment details
 
-        """
-        appointment = self.fetch_appointment_details(data) #get the appointment first
+        # Getting the appoinment details using the SN
+        appointment = self.fetch_appointment_details(data)
         if appointment:
-            #data
             notificationData = {
                 "USER_EMAIL": data["User_Email"],
                 "APPOINTMENT_DATE": appointment[0]["APPOINTMENT_DATE"],
@@ -233,10 +271,10 @@ class AllocateDBBehav(CyclicBehaviour):
             msg = Message(to=DS.Notification["username"], thread="Another_Thread")     # Instantiate the message
 
             # Setting Metadata
-            msg.set_metadata("performative", "inform")  # Set the "propose" FIPA performative
+            msg.set_metadata("performative", "inform")  # Set the "inform" FIPA performative
             msg.set_metadata("ontology", "SENG696-G10-Ontology")  # Set the ontology of the message content
             msg.set_metadata("thread", "SENG696-G10-Project")  # Set the thread of the message content
-            msg.set_metadata("language", "JSON")       # Set the language of the message content
+            msg.set_metadata("language", "JSON")        # Set the language of the message content
             
             msg.body = json.dumps(notificationData, default=str)
             if DEBUG: print("\n\nREQUESTING NOTIFICATION\n", msg)
@@ -248,14 +286,18 @@ class AllocateDBBehav(CyclicBehaviour):
             return 0
 
 
-
     def allocate_appointment(self, data):
-        """
-            This function allocate the appointment to the user, the appointment should be given, this function needs
-            User_ID and Appointment_ID for allocating
-
-        """
-        if DEBUG: print(data)
+        # This function is responsible for allocating an 
+        # in the Appointments DB
+        # 
+        # Args:
+        #     data (dict): A dictionary containing the Appointment's SN
+        #
+        # Returns:
+        #     int: indecating the state of the allocation operation
+        #       1- Successful appoinment allocation
+        #       2- Appoinment allocation failed
+        #       0- Session timeout i.e. response was not recieved
 
         #defining DB credintials
         mydb = mysql.connector.connect(
@@ -268,52 +310,52 @@ class AllocateDBBehav(CyclicBehaviour):
 
         mycursor = mydb.cursor(dictionary=True)
 
-        #Query for allocating the appointment based on given User_ID and Appointment_ID 
-
+        # Query to allocate the appointment to the user
         sql = (
             "UPDATE appointments_db.appointments "
-            # " SET APPOINTMENT_STATUS = 'B', PATIENT_ID =%(User_ID)s "
             "SET APPOINTMENT_STATUS = if(PATIENT_ID IS NULL, 'B', APPOINTMENT_STATUS), "
             "PATIENT_ID = if(PATIENT_ID IS NULL, %(User_ID)s, PATIENT_ID) "
             "WHERE (SN = %(Appointment_ID)s)"
         )
 
-        #Error handling for query executing
-
+        # Query execution and error handling
         try:
             mycursor.execute(sql, data)
             mydb.commit()
             results = mycursor.fetchall()
             mycursor.close()
             if DEBUG:
-                print(mycursor.rowcount, "records updated.") #TODO CHECK IF len < 1
+                print(mycursor.rowcount, "records updated.")
                 for x in results:
                     print(x)
 
-            print("\n\nEffected Resutls!!:", type(mycursor.rowcount), mycursor.rowcount, "\n\n")
             if(int(mycursor.rowcount) > 0):
-                if DEBUG: print("returning 1")
+                if DEBUG: print("record allocated")
                 return 1
             else:
-                if DEBUG: print("no records available")
+                if DEBUG: print("record cannot be allocated")
                 return 2
 
         except mysql.connector.Error as err:
             if DEBUG: print(F"Something in connection went wrong!:\n{err}")
             mycursor.close()
-            return 3
+            return 0
 
     async def msg_response(self, msg, state):
-
-        """
-            This function is responsible for creating messeages based on allocating appointments states
-            for example in sucessful state it gives an confirmation for future use
-
-        """
+        # This function is responsible for creating a response messeage
+        # based on the allocate state, where it changes the messages 
+        # perfomative into "confirm" on a successful state and "failure"
+        # otherwise
+        #
+        # Args:
+        #     msg (spade.message.Message): The message template of SPADE
+        #     state (bool): The state of the login operation
 
         if state:
-            msg.set_metadata("performative", "confirm")  # Set the "confimr" FIPA performative
+            # Set the "confirm" FIPA performative
+            msg.set_metadata("performative", "confirm")
         else:
+            # Set the "failutre" FIPA performative
             msg.set_metadata("performative", "failure")
 
         print("\n_______RESPONSE:_______\n",msg, "\n______________")
@@ -321,17 +363,19 @@ class AllocateDBBehav(CyclicBehaviour):
         print("Response sent!")
 
     async def run(self):
-
-        """ 
-            In this function the agent waits for a specified amount of time and listen for messages 
-            then based on result of allocate_appointment method which was explained earier return success or failure flag
-
-        """
+        # This is a method required part of spade's CyclicBehaviour
+        # class and defines the main functionality of the behaviour
+        #
+        # The behaviour refreshs every 10 secs waiting for a request
+        # If a request comes through it is processed and a reply is sent
+        # If no request comes through the cycle repeats waiting
 
         print("\n\n\n====================================")
         print("AllocateDB Behav running")
-        msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
+        # wait for a message for 10 seconds
+        msg = await self.receive(timeout=10)
         if msg:
+            # if a message comes print a log of the details
             print("\n________________________\n", msg, "\n________________________")
             print(F"Message received with content: {msg.body}")
             print(msg.metadata)
@@ -339,7 +383,11 @@ class AllocateDBBehav(CyclicBehaviour):
             request = json.loads(msg.body)
             print("Patient ID is:", request["User_ID"], ",\t\tAppointment ID is:", request["Appointment_ID"])
 
+            # Attempting appointment allocation in the database
             response = self.allocate_appointment(request)
+
+            # Preparing and sending the response based on the
+            # allocation result
             if response == 1:
                 msg.body = json.dumps(response, default=str)
                 await self.msg_response(msg.make_reply(), True)
@@ -355,21 +403,50 @@ class AllocateDBBehav(CyclicBehaviour):
 
         else:
             print("Did not received any message after 10 seconds")
-            # self.kill()
     
     async def on_end(self):
+        # This is a method required part of spade's CyclicBehaviour
+        # which defines the actions to be taken on the end of the behaviour
         await self.agent.stop()
 
 class SchedulingAgentComponent(Agent):
+    # This is a empty class that extends the SPADE Agent class
+    # There are no behaviours loaded into the class in the declaration
+    # however, the required behaviour will be loaded at runtime
+    
     async def setup(self):
         print("Starting Scheduling Agent")
 
 class Scheduling_Agent():
+    # This is our login agent class which will create an instance
+    # of the LoginAgentComponent and load the behaviour into it.
+    # The class contains the following members:
+    # 1- Qbehav <SPADE.Behaviour> where the Query behaviour will be 
+    #       loaded at run-time
+    # 2- Abehav <SPADE.Behaviour> where the Allocate behaviour will be 
+    #       loaded at run-time
+    # 3- Q_template <SPADE.Behaviour> A message template where the 
+    #       performative is "query"
+    # 4- A_template <SPADE.Template> A message template where the 
+    #       performative is "propose"
+    # 3- schedulingagent <SchedulingAgentComponent> which will contain an
+    #       instance of the class extending the agent to be able to load 
+    #       the behaviour into it and run it
+    # 4- future <SPADE.Future> which will be used to get the outputs from
+    #       the bahviours at the end of the run
+    #
+    # 5- loadBehaviour() which creates instances of the behaviours and
+    #       message templates
+    # 6- beginCommunications() this function obtains the required 
+    #       credintials of the agent and loads them in addition to the 
+    #       behaviours, where it maps each behaviour to a certain
+    #       performative using the message template to process the
+    #       incoming messages correctly, then it starts the agent and 
+    #       waits until a user interrupt killing the agent
 
-    """
-        The actual class for scheduling agent which has the already explained behaviours for its two behaviours
-    """
     def loadBehaviour(self):
+        # A method that creates instances of the required behaviours
+        # and message templates
         self.Qbehav = QueryDBBehav()
         self.Q_template = Template()
         self.Q_template.set_metadata("performative", "query")
@@ -381,7 +458,13 @@ class Scheduling_Agent():
         
 
     def beginCommunications(self):
-        self.schedulingagent = SchedulingAgentComponent(DS.Scheduling["username"], DS.Scheduling["password"])
+        # This method obtains the required credintials of the agent 
+        # and loads them in addition to the behaviours and their message
+        # templates, then it starts the agent and waits until it is 
+        # interrupted by a user terminating the agent and the application
+        self.schedulingagent = SchedulingAgentComponent(
+            DS.Scheduling["username"], DS.Scheduling["password"]
+        )
         self.schedulingagent.add_behaviour(self.Qbehav, self.Q_template)
         self.schedulingagent.add_behaviour(self.Abehav, self.A_template)
         self.future = self.schedulingagent.start()
@@ -401,25 +484,13 @@ class Scheduling_Agent():
 
 #%%
 if __name__ == "__main__":
+    # This is main, creates an instance of our agent class and
+    # calls the appropriate functions to start it.
+    
     sch = Scheduling_Agent()
     sch.loadBehaviour()
     sch.beginCommunications()
     
-    # fetch_appointments(query_data)
-    # allocate_appointment(allocate_data)
-    # a = SchedulingAgent(DS.Scheduling["username"], DS.Scheduling["password"])
-    # future = a.start()
-    # future.result()
-    # print("Wait until user interrupts with ctrl+C")
-    # try:
-    #     while True:
-    #         time.sleep(1)
-    # except KeyboardInterrupt:
-    #     print("Stopping...")
-    
-    # a.stop()
-
-
 
 
 

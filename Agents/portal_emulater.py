@@ -9,7 +9,7 @@ proc = subprocess.Popen(['python3', 'UI_Agent.py',  '-c 1', '-u sAli@domain.com'
 out = proc.communicate()
 if proc.poll() == 1:
     output = json.loads(out[0].decode("utf-8")) # output here is an object
-    print("Exit Code:", proc.poll(), "\nData: ", output)
+    print("Exit Code:", proc.poll(), "\nData: ", out)
 else:
     print("Exit Code:", proc.poll(), "\nData: ", out[0].decode("utf-8"))
 
@@ -53,7 +53,7 @@ import os
 
 proc = subprocess.Popen(
     ['python3', 'UI_Agent.py',  '-c 4', 
-    '-u Tariq.AlShoura@ucalgary.ca', '-o 1', '-t 59'], 
+    '-u Tariq.AlShoura@ucalgary.ca', '-o 13', '-t 4'], 
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 out = proc.communicate()
 print("Exit Code:", proc.poll(), "Data: ", out[0].decode("utf-8"))
